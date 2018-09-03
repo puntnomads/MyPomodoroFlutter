@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vibrate/vibrate.dart';
 
 void main() {
   runApp(new Container(
@@ -37,6 +38,7 @@ class HomePageState extends State<HomePage> with TickerProviderStateMixin {
         workingNow = !workingNow;
         setState(() {});
         startTime();
+        Vibrate.vibrate();
       }
     });
   }
