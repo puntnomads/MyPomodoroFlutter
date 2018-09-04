@@ -1,61 +1,81 @@
 import 'package:flutter/material.dart';
 import 'package:vibrate/vibrate.dart';
+import 'package:screen/screen.dart';
 
 void main() {
-  runApp(new Container(
-    color: Colors.white,
-  ));
   runApp(new MaterialApp(
-    theme: new ThemeData(primarySwatch: Colors.red),
-    home: new HomePage(),
+    home: new Pomodoro(),
   ));
 }
 
-class HomePage extends StatefulWidget {
-  HomePageState createState() => new HomePageState();
+class Pomodoro extends StatefulWidget {
+  PomodoroState createState() => new PomodoroState();
 }
 
-class HomePageState extends State<HomePage> with TickerProviderStateMixin {
+class PomodoroState extends State<Pomodoro> with TickerProviderStateMixin {
   AnimationController _controller;
   int workingTime = 28;
-  int shortBreakTime = 5;
+  int shortBreakTime = 2;
   int longBreakTime = 4;
+  bool start = true;
   bool workingNow = true;
   bool breakNow = false;
   int numberOfBreaks = 0;
-  String workingTask = 'Working';
+  String workingTask = 'Working Time';
   String shortBreakTask = 'Walk Outside';
   String longBreakTask = 'Meditate';
 
   void startTime() {
     _controller = new AnimationController(
       vsync: this,
-      duration: Duration(seconds: workingNow ? workingTime : shortBreakTime),
+      duration: Duration(
+          minutes: workingNow
+              ? workingTime
+              : numberOfBreaks < 4 ? shortBreakTime : longBreakTime),
     )..forward();
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        print('hello');
         workingNow = !workingNow;
+        if (workingNow == false) {
+          numberOfBreaks += 1;
+        }
         setState(() {});
         startTime();
-        Vibrate.vibrate();
+        final Iterable<Duration> pauses = [
+          const Duration(milliseconds: 100),
+          const Duration(milliseconds: 100),
+          const Duration(milliseconds: 100),
+        ];
+        Vibrate.vibrateWithPauses(pauses);
+        if (numberOfBreaks == 4) {
+          numberOfBreaks = 0;
+        }
       }
     });
   }
 
   @override
   void initState() {
+    Screen.keepOn(true);
     _controller = new AnimationController(
       vsync: this,
-      duration: Duration(seconds: workingNow ? workingTime : shortBreakTime),
+      duration: Duration(minutes: workingNow ? workingTime : shortBreakTime),
     );
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         // Do something
-        print('hello');
         workingNow = !workingNow;
+        if (workingNow == false) {
+          numberOfBreaks += 1;
+        }
         setState(() {});
         startTime();
+        final Iterable<Duration> pauses = [
+          const Duration(milliseconds: 100),
+          const Duration(milliseconds: 100),
+          const Duration(milliseconds: 100),
+        ];
+        Vibrate.vibrateWithPauses(pauses);
       }
     });
   }
@@ -63,40 +83,72 @@ class HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return new Scaffold(
-        floatingActionButton: new FloatingActionButton(
-          child: new Icon(Icons.play_arrow),
-          onPressed: () {
-            _controller.forward();
-          },
-        ),
+        backgroundColor: Colors.black,
         body: new Column(
+          mainAxisAlignment: MainAxisAlignment.end,
           children: <Widget>[
-            new RaisedButton(
-              child: const Text('Pause'),
-              color: Theme.of(context).accentColor,
-              elevation: 4.0,
-              splashColor: Colors.blueGrey,
-              onPressed: () {
-                // Perform some action
-                _controller.stop();
-              },
-            ),
-            new RaisedButton(
-              child: const Text('Reset'),
-              color: Theme.of(context).accentColor,
-              elevation: 4.0,
-              splashColor: Colors.blueGrey,
-              onPressed: () {
-                // Perform some action
-                _controller.reset();
-              },
-            ),
             new Center(
               child: new PomodoroTimer(
                 timeRemainingInSeconds: new IntTween(
                   begin: _controller.duration.inSeconds,
                   end: 0,
                 ).animate(_controller),
+                task: workingNow
+                    ? workingTask
+                    : numberOfBreaks < 4 ? shortBreakTask : longBreakTask,
+              ),
+            ),
+            new Container(
+              height: 80.0,
+              child: new Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: <Widget>[
+                  new Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        new Container(
+                          height: 50.0,
+                          child: new RaisedButton(
+                            child: new Text(
+                              start == true ? 'START' : 'PAUSE',
+                              style: new TextStyle(
+                                  fontSize: 15.0, color: Colors.white),
+                            ),
+                            color: Colors.grey[600],
+                            elevation: 0.0,
+                            splashColor: Colors.blueGrey,
+                            onPressed: () {
+                              if (start == true) {
+                                start = !start;
+                                _controller.forward();
+                                setState(() {});
+                              } else {
+                                start = !start;
+                                _controller.stop();
+                                setState(() {});
+                              }
+                            },
+                          ),
+                        ),
+                        new Container(
+                          height: 50.0,
+                          child: new RaisedButton(
+                            child: new Text(
+                              'RESET',
+                              style: new TextStyle(
+                                  fontSize: 15.0, color: Colors.white),
+                            ),
+                            color: Colors.grey[600],
+                            elevation: 0.0,
+                            splashColor: Colors.blueGrey,
+                            onPressed: () {
+                              _controller.reset();
+                            },
+                          ),
+                        ),
+                      ]),
+                ],
               ),
             ),
           ],
@@ -105,21 +157,24 @@ class HomePageState extends State<HomePage> with TickerProviderStateMixin {
 }
 
 class PomodoroTimer extends AnimatedWidget {
-  PomodoroTimer({this.timeRemainingInSeconds})
-      : super(listenable: timeRemainingInSeconds);
-
   Animation<int> timeRemainingInSeconds;
+  final String task;
+
+  PomodoroTimer({this.timeRemainingInSeconds, this.task})
+      : super(listenable: timeRemainingInSeconds);
 
   Widget build(BuildContext context) {
     String minutes = '${(timeRemainingInSeconds.value / 60).floor()}';
     String seconds = '${(timeRemainingInSeconds.value % 60)}'.padLeft(2, '0');
-    return new Text(
-      '$minutes:$seconds',
-      style: Theme.of(context).textTheme.display2,
-    );
+    return new Column(children: [
+      new Text(
+        task,
+        style: new TextStyle(fontSize: 16.0, color: Colors.white),
+      ),
+      new Text(
+        '$minutes:$seconds',
+        style: new TextStyle(fontSize: 40.0, color: Colors.white),
+      )
+    ]);
   }
 }
-
-// https://gist.github.com/collinjackson/d7dfff892aeb365a28efaac531aa3b4f
-// https://stackoverflow.com/questions/45130497/creating-a-custom-clock-widget-in-flutter
-// https://stackoverflow.com/questions/51451662/flutter-keeping-time
